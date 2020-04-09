@@ -3,6 +3,10 @@
 //! For more details, see the traits [`Pattern`], [`Searcher`],
 //! [`ReverseSearcher`], and [`DoubleEndedSearcher`].
 
+use std::cmp;
+use std::fmt;
+use std::usize;
+
 // Pattern
 
 /// A string pattern.
@@ -601,38 +605,40 @@ macro_rules! searcher_methods {
 // // Impl for &[T]
 // /////////////////////////////////////////////////////////////////////////////
 
-// /// Associated type for `<&[T] as Pattern<'a>>::Searcher`.
-// #[derive(Clone, Debug)]
-// pub struct CharSliceSearcher<'a, 'b, T: 'a + Eq>(<MultiCharEqPattern<T, &'b [T]> as Pattern<'a, T>>::Searcher);
+/// Associated type for `<&[T] as Pattern<'a>>::Searcher`.
+#[derive(Clone, Debug)]
+pub struct CharSliceSearcher<'a, 'b, T: 'a + Eq>(<MultiCharEqPattern<T, &'b [T]> as Pattern<'a, T>>::Searcher);
 
-// impl<'a, 'b, T: Eq> Searcher<'a, T> for CharSliceSearcher<'a, 'b, T> {
-//     searcher_methods!(forward);
-// }
+impl<'a, 'b, T: Eq> Searcher<'a, T> for CharSliceSearcher<'a, 'b, T> {
+    searcher_methods!(forward);
+}
 
-// impl<'a, 'b, T: Eq> ReverseSearcher<'a, T> for CharSliceSearcher<'a, 'b, T> {
-//     searcher_methods!(reverse);
-// }
+impl<'a, 'b, T: Eq> ReverseSearcher<'a, T> for CharSliceSearcher<'a, 'b, T> {
+    searcher_methods!(reverse);
+}
 
-// impl<'a, 'b, T: Eq> DoubleEndedSearcher<'a, T> for CharSliceSearcher<'a, 'b, T> {}
+impl<'a, 'b, T: Eq> DoubleEndedSearcher<'a, T> for CharSliceSearcher<'a, 'b, T> {}
 
 // /// Searches for [T] that are equal to any of the [T] in the array
 // impl<'a, 'b, T: 'a + Eq> Pattern<'a, T> for &'b [T] {
 //     pattern_methods!(CharSliceSearcher<'a, 'b, T>, MultiCharEqPattern, CharSliceSearcher);
 // }
 
-// /////////////////////////////////////////////////////////////////////////////
-// // Impl for F: FnMut(char) -> bool
-// /////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+// Impl for F: FnMut(T) -> bool
+/////////////////////////////////////////////////////////////////////////////
 
-// /// Associated type for `<F as Pattern<'a>>::Searcher`.
-// #[derive(Clone)]
-// pub struct CharPredicateSearcher<'a, F>(<MultiCharEqPattern<F> as Pattern<'a>>::Searcher)
-// where
-//     F: FnMut(char) -> bool;
+/// Associated type for `<F as Pattern<'a>>::Searcher`.
+#[derive(Clone)]
+pub struct CharPredicateSearcher<'a, T: 'a + Eq, F>(
+    <MultiCharEqPattern<T, F> as Pattern<'a, T>>::Searcher,
+)
+where
+    F: FnMut(&T) -> bool;
 
-// impl<F> fmt::Debug for CharPredicateSearcher<'_, F>
+// impl<T: Eq, F> fmt::Debug for CharPredicateSearcher<'_, T, F>
 // where
-//     F: FnMut(char) -> bool,
+//     F: FnMut(&T) -> bool,
 // {
 //     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 //         f.debug_struct("CharPredicateSearcher")
@@ -641,29 +647,37 @@ macro_rules! searcher_methods {
 //             .finish()
 //     }
 // }
-// impl<'a, F> Searcher<'a> for CharPredicateSearcher<'a, F>
-// where
-//     F: FnMut(char) -> bool,
-// {
-//     searcher_methods!(forward);
-// }
 
-// impl<'a, F> ReverseSearcher<'a> for CharPredicateSearcher<'a, F>
-// where
-//     F: FnMut(char) -> bool,
-// {
-//     searcher_methods!(reverse);
-// }
+impl<'a, T: Eq, F> Searcher<'a, T> for CharPredicateSearcher<'a, T, F>
+where
+    F: FnMut(&T) -> bool,
+{
+    searcher_methods!(forward);
+}
 
-// impl<'a, F> DoubleEndedSearcher<'a> for CharPredicateSearcher<'a, F> where F: FnMut(char) -> bool {}
+impl<'a, T: Eq, F> ReverseSearcher<'a, T> for CharPredicateSearcher<'a, T, F>
+where
+    F: FnMut(&T) -> bool,
+{
+    searcher_methods!(reverse);
+}
 
-// /// Searches for chars that match the given predicate
-// impl<'a, F> Pattern<'a> for F
-// where
-//     F: FnMut(char) -> bool,
-// {
-//     pattern_methods!(CharPredicateSearcher<'a, F>, MultiCharEqPattern, CharPredicateSearcher);
-// }
+impl<'a, T: Eq, F> DoubleEndedSearcher<'a, T> for CharPredicateSearcher<'a, T, F> where
+    F: FnMut(&T) -> bool
+{
+}
+
+/// Searches for chars that match the given predicate
+impl<'a, T: 'a + Eq, F> Pattern<'a, T> for F
+where
+    F: FnMut(&T) -> bool,
+{
+    pattern_methods!(
+        CharPredicateSearcher<'a, T, F>,
+        MultiCharEqPattern,
+        CharPredicateSearcher
+    );
+}
 
 // /////////////////////////////////////////////////////////////////////////////
 // // Impl for &&[T]

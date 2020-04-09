@@ -2280,50 +2280,36 @@ pub trait SliceStr<'a, T: Eq> {
     //         self.trim_end_matches(|c: char| c.is_whitespace())
     //     }
 
-    //     /// Returns a string slice with all prefixes and suffixes that match a
-    //     /// pattern repeatedly removed.
-    //     ///
-    //     /// The pattern can be a [`char`] or a closure that determines if a
-    //     /// character matches.
-    //     ///
-    //     /// # Examples
-    //     ///
-    //     /// Simple patterns:
-    //     ///
-    //     /// ```
-    //     /// assert_eq!("11foo1bar11".trim_matches('1'), "foo1bar");
-    //     /// assert_eq!("123foo1bar123".trim_matches(char::is_numeric), "foo1bar");
-    //     ///
-    //     /// let x: &[_] = &['1', '2'];
-    //     /// assert_eq!("12foo1bar12".trim_matches(x), "foo1bar");
-    //     /// ```
-    //     ///
-    //     /// A more complex pattern, using a closure:
-    //     ///
-    //     /// ```
-    //     /// assert_eq!("1foo1barXX".trim_matches(|c| c == '1' || c == 'X'), "foo1bar");
-    //     /// ```
-    //     #[must_use = "this returns the trimmed string as a new slice, \
-    //                   without modifying the original"]
-    //     #[stable(feature = "rust1", since = "1.0.0")]
-    //     pub fn trim_matches<'a, P>(&'a self, pat: P) -> &'a str
-    //     where
-    //         P: Pattern<'a, Searcher: DoubleEndedSearcher<'a>>,
-    //     {
-    //         let mut i = 0;
-    //         let mut j = 0;
-    //         let mut matcher = pat.into_searcher(self);
-    //         if let Some((a, b)) = matcher.next_reject() {
-    //             i = a;
-    //             j = b; // Remember earliest known match, correct it below if
-    //             // last match is different
-    //         }
-    //         if let Some((_, b)) = matcher.next_reject_back() {
-    //             j = b;
-    //         }
-    //         // SAFETY: `Searcher` is known to return valid indices.
-    //         unsafe { self.get_unchecked(i..j) }
-    //     }
+    /// Returns a string slice with all prefixes and suffixes that match a
+    /// pattern repeatedly removed.
+    ///
+    /// The pattern can be a [`char`] or a closure that determines if a
+    /// character matches.
+    ///
+    /// # Examples
+    ///
+    /// Simple patterns:
+    ///
+    /// ```
+    /// assert_eq!("11foo1bar11".trim_matches('1'), "foo1bar");
+    /// assert_eq!("123foo1bar123".trim_matches(char::is_numeric), "foo1bar");
+    ///
+    /// let x: &[_] = &['1', '2'];
+    /// assert_eq!("12foo1bar12".trim_matches(x), "foo1bar");
+    /// ```
+    ///
+    /// A more complex pattern, using a closure:
+    ///
+    /// ```
+    /// assert_eq!("1foo1barXX".trim_matches(|c| c == '1' || c == 'X'), "foo1bar");
+    /// ```
+    #[must_use = "this returns the trimmed string as a new slice, \
+                      without modifying the original"]
+    // #[stable(feature = "rust1", since = "1.0.0")]
+    fn trim_matches<P>(&'a self, pat: P) -> &'a [T]
+    where
+        P: Pattern<'a, T>,
+        P::Searcher: DoubleEndedSearcher<'a, T>;
 
     //     /// Returns a string slice with all prefixes that match a pattern
     //     /// repeatedly removed.
@@ -2781,6 +2767,26 @@ impl<'a, T: 'a + Eq> SliceStr<'a, T> for [T] {
     {
         RMatches(self.matches(pat).0)
     }
+
+    fn trim_matches<P>(&'a self, pat: P) -> &'a [T]
+    where
+        P: Pattern<'a, T>,
+        P::Searcher: DoubleEndedSearcher<'a, T>,
+    {
+        let mut i = 0;
+        let mut j = 0;
+        let mut matcher = pat.into_searcher(self);
+        if let Some((a, b)) = matcher.next_reject() {
+            i = a;
+            j = b; // Remember earliest known match, correct it below if
+                   // last match is different
+        }
+        if let Some((_, b)) = matcher.next_reject_back() {
+            j = b;
+        }
+        // SAFETY: `Searcher` is known to return valid indices.
+        unsafe { self.get_unchecked(i..j) }
+    }
 }
 
 // impl_fn_for_zst! {
@@ -3073,7 +3079,7 @@ impl<'a, T: 'a + Eq> SliceStr<'a, T> for [T] {
 
 #[cfg(test)]
 mod tests {
-    use super::{SliceStr, AliasedSliceStr};
+    use super::{AliasedSliceStr, SliceStr};
 
     #[test]
     fn find() {
@@ -3102,6 +3108,7 @@ mod tests {
         assert!(fst == &b"3451"[..]);
     }
 
+    #[test]
     fn contains() {
         let haystack = &b"1234512345"[..];
         assert!(!haystack[..].contains_slice(&b"xy"[..]));
